@@ -1,0 +1,90 @@
+name: Build and test Elixir project
+
+on:
+  push:
+    branches:
+      - dev
+  pull_request:
+    branches:
+      - dev
+
+jobs:
+  compile:
+    name: Compile
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: erlef/setup-beam@v1
+        with:
+          otp-version: '26.1'
+          elixir-version: '1.15.7'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          path: ./time_manager
+      - name: Install dependencies
+        working-directory: ./time_manager
+        run: mix deps.get
+      - name: Compile dependencies
+        working-directory: ./time_manager
+        run: mix deps.compile
+    
+  test:
+    name: Test
+    needs: compile
+    runs-on: ubuntu-latest
+
+    services:
+      control_db_test:
+        image: postgres:latest
+        ports:
+          - 5432:5432
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: time_manager_test
+          POSTGRES_HOST_AUTH_METHOD: 'trust'
+        options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
+    
+    env:
+      MIX_ENV: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: '26.1'
+          elixir-version: '1.15.7'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install dependencies
+        working-directory: ./time_manager
+        run: mix deps.get
+      - name: Compile dependencies
+        working-directory: ./time_manager
+        run: mix deps.compile
+      - name: Check formatting
+        working-directory: ./time_manager
+        run: mix format --check-formatted    
+
+  credo:
+    name: Credo
+    needs: compile
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Set up Elixir
+        uses: erlef/setup-beam@v1
+        with:
+          otp-version: '26.1'
+          elixir-version: '1.15.7'
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install dependencies
+        working-directory: ./time_manager
+        run: mix deps.get
+      - name: Compile dependencies
+        working-directory: ./time_manager
+        run: mix deps.compile
+      # - name: Run Credo
+      #   working-directory: ./time_manager
+      #   run: mix credo 

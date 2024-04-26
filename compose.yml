@@ -1,0 +1,65 @@
+version: "3.9"
+
+name: tm
+
+services:
+  postgres:
+    container_name: ${PGHOST}
+    image: postgres:16.0
+    environment:
+      POSTGRES_USER: "${PGUSER}"
+      POSTGRES_PASSWORD: ${PGPASSWORD}
+      POSTGRES_DB: ${PGDATABASE}
+    env_file:
+      - .env
+    expose:
+      - ${PGPORT}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U postgres" ]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  phoenix:
+    container_name: phx
+    # image: elixir:1.14.5
+    build:
+      context: ./time_manager
+      tags:
+        - phx:latest
+    # Use Postgres container predefined HEALTHCHECK Dockerfile's instruction
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGUSER: ${PGUSER}
+      PGPASSWORD: ${PGPASSWORD}
+      PGDATABASE: ${PGDATABASE}
+      PGHOST: ${PGHOST}
+      PGPORT: ${PGPORT}
+    volumes:
+      - ./time_manager:/app
+    env_file:
+      - .env
+    ports:
+      - 4000:4000
+    init: true # Make phx.server pid 1, allowing it to get SIGTERM signals when the container is stopped
+
+  vue:
+    container_name: vue
+    build:
+      context: ./front
+      tags:
+        - vue:latest
+    ports:
+      - 5173:5173
+    init: true
+    volumes:
+      - ./front:/app
+    tty: true
+    environment:
+      - CHOKIDAR_USEPOLLING=true
+volumes:
+  pgdata:
